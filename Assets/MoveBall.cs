@@ -16,6 +16,6 @@ public class MoveBall : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        rb.velocity = new Vector2(0f,-moveSpeed);
+        rb.linearVelocity = new Vector2(0f,-moveSpeed);
     }
 }

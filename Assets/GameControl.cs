@@ -80,6 +80,7 @@ public class GameControl : MonoBehaviour
         foreach (var item in ballsObjects1)
         {
             stack1.Push(item);
+            Debug.Log(item.tag);
         }
         foreach (var item in ballsObjects2)
         {
@@ -98,7 +99,7 @@ public class GameControl : MonoBehaviour
     {
         if(done == 3)
         {
-            Debug.Log("Congratulations You Win ");
+            //Debug.Log("Congratulations You Win ");
         }
     }
 
