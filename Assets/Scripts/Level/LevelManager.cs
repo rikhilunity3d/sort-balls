@@ -18,8 +18,14 @@ public class LevelManager : MonoBehaviour
     }
 
     public void LoadNextLevel()
-{
-    int nextIndex = (currentLevelIndex + 1) % levelLoader.LevelCount;
-    LoadLevel(nextIndex);
-}
+    {
+        int nextIndex = (currentLevelIndex + 1) % levelLoader.LevelCount;
+        LoadLevel(nextIndex);
+    }
+
+    public int GetCurrentLevelScore()
+    {
+        return levelLoader.GetCurrentLevelScore(); // Add in LevelLoader
+    }
+
 }

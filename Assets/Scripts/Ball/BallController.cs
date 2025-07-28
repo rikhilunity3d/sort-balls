@@ -39,6 +39,10 @@ public class BallController : MonoBehaviour
             case BallColorType.Grey:
                 spriteRenderer.color = Color.grey;
                 break;
+            case BallColorType.None:
+                spriteRenderer.color = new Color(0, 0, 0, 0); // transparent
+                break;
+
         }
     }
 
@@ -58,7 +62,7 @@ public class BallController : MonoBehaviour
         );
 
         transform.DOMove(liftedPos, 0.3f).SetEase(Ease.Unset);
-       // GetComponent<SpriteRenderer>().sortingOrder = 10;
+        // GetComponent<SpriteRenderer>().sortingOrder = 10;
     }
 
 

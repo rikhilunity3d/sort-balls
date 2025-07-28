@@ -7,4 +7,5 @@ public enum BallColorType
     Purple,
     Orange,
     Grey,
+    None
 }

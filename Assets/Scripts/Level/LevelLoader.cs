@@ -8,7 +8,7 @@ public class LevelLoader : MonoBehaviour
     [SerializeField] private TubeController tubePrefab;
     [SerializeField] private Transform tubeParent;
 
-    [Header("📦 Level Data")]
+    [Header("📦 Level Data List")]
     [SerializeField] private List<LevelData> levelDataList;
 
     [Header("🧱 Tube Layout")]
@@ -17,17 +17,15 @@ public class LevelLoader : MonoBehaviour
     private Transform[] layoutPoints;
     private List<TubeController> tubes = new List<TubeController>();
     public List<TubeController> Tubes => tubes;
-
     public int LevelCount => levelDataList.Count;
 
-    #region Unity Lifecycle
+    private int currentLevelIndex = 0;
 
     private void Awake()
     {
-        // ✅ Layout point validate
         if (tubeLayoutPoints == null)
         {
-            Debug.LogError("❌ tubeLayoutPoints not assigned!");
+            Debug.LogError("❌ tubeLayoutPoints is not assigned!");
             return;
         }
 
@@ -37,7 +35,6 @@ public class LevelLoader : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             layoutPoints[i] = tubeLayoutPoints.GetChild(i);
-
             if (layoutPoints[i] == null)
                 Debug.LogWarning($"⚠️ Layout point {i} is NULL!");
         }
@@ -45,12 +42,9 @@ public class LevelLoader : MonoBehaviour
         Debug.Log($"📍 Loaded {layoutPoints.Length} layout points.");
     }
 
-    #endregion
-
     public void LoadLevel(int levelIndex)
     {
-        #region 🧹 STEP 1: Clear old level
-
+        #region 🧹 Step 1: Clear Old Tubes
         foreach (var tube in tubes)
         {
             if (tube != null)
@@ -59,7 +53,7 @@ public class LevelLoader : MonoBehaviour
         tubes.Clear();
         #endregion
 
-        #region 📦 STEP 2: Load level data
+        #region 📦 Step 2: Load LevelData
         if (levelIndex < 0 || levelIndex >= levelDataList.Count)
         {
             Debug.LogError($"❌ Invalid level index: {levelIndex}");
@@ -68,15 +62,18 @@ public class LevelLoader : MonoBehaviour
 
         LevelData level = levelDataList[levelIndex];
         BallColorType[][] tubeColors = level.GetTubes();
+        currentLevelIndex = levelIndex;
 
         if (tubeColors == null)
         {
             Debug.LogError($"❌ Level {levelIndex} data is NULL.");
             return;
         }
+
+        Debug.Log($"🧠 Difficulty: {level.difficulty}, Filled: {level.GetFilledTubeCount()}, Empty: {level.GetEmptyTubeCount()}, Score: {level.scoreReward}");
         #endregion
 
-        #region 🧪 STEP 3: Instantiate tubes and balls
+        #region 🧪 Step 3: Create Tubes and Balls
         for (int i = 0; i < tubeColors.Length; i++)
         {
             var colors = tubeColors[i];
@@ -87,9 +84,7 @@ public class LevelLoader : MonoBehaviour
                 continue;
             }
 
-            // ✅ Step 1: Instantiate tube
-            // ✅ Tube banate hain
-            //TubeController tube = Instantiate(tubePrefab, tubeParent);
+            // Instantiate tube without parent (avoid prefab parenting bug)
             TubeController tube = Instantiate(tubePrefab);
 
             if (tube == null)
@@ -98,37 +93,37 @@ public class LevelLoader : MonoBehaviour
                 continue;
             }
 
-            // ✅ Step 2: Set parent only if it's NOT a prefab
+            // ✅ Set parent if valid scene object
             if (tubeParent != null && tubeParent.gameObject.scene.IsValid())
             {
                 tube.transform.SetParent(tubeParent, false);
             }
             else
             {
-                Debug.LogWarning("⚠️ tubeParent is not a scene object or is null.");
+                Debug.LogWarning("⚠️ tubeParent is not valid or not assigned.");
             }
 
-            // ✅ Step 3: Set position using layout or fallback
+            // ✅ Use layout point or fallback
             if (i < layoutPoints.Length && layoutPoints[i] != null)
             {
                 tube.transform.position = layoutPoints[i].position;
             }
             else
             {
-                tube.transform.position = new Vector3(i * 2f, 0, 0); // fallback
-                Debug.LogWarning($"⚠️ Missing layout for tube {i}, used fallback.");
+                tube.transform.position = new Vector3(i * 2f, 0, 0);
+                Debug.LogWarning($"⚠️ Missing layout for tube {i}, fallback used.");
             }
 
-            // ✅ Step 4: Register
             tubes.Add(tube);
 
-
-            // ⚪ Ball instantiate
+            // 🎨 Spawn balls
             for (int j = 0; j < colors.Length; j++)
             {
-                var color = colors[j];
-                BallController ball = Instantiate(ballPrefab, tube.transform);
+                BallColorType color = colors[j];
+                if (color == BallColorType.None) continue; //Skip empty slots
 
+                BallController ball = Instantiate(ballPrefab, tube.transform);
+                
                 if (ball == null)
                 {
                     Debug.LogError($"❌ Failed to instantiate ball {j} in tube {i}");
@@ -145,9 +140,19 @@ public class LevelLoader : MonoBehaviour
         }
         #endregion
 
-        #region ✅ STEP 4: Register in GameManager
+        #region ✅ Step 4: Register Tubes in GameManager
         GameManager.Instance?.SetTubes(tubes);
         Debug.Log($"✅ Level {levelIndex} loaded with {tubes.Count} tubes.");
         #endregion
     }
+
+    //
+    public int GetCurrentLevelScore()
+    {
+        if (currentLevelIndex < 0 || currentLevelIndex >= levelDataList.Count)
+            return 0;
+
+        return levelDataList[currentLevelIndex].scoreReward;
+    }
+
 }

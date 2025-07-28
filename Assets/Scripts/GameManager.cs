@@ -11,6 +11,8 @@ public class GameManager : MonoBehaviour
     private TubeController selectedTube = null;
     [SerializeField] private LevelManager levelManager;
 
+    private int totalScore = 0;
+
 
 
 
