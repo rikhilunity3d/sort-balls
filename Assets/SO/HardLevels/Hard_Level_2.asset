@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb67a697286954cd7a33b913d962fa69, type: 3}
+  m_Name: Hard_Level_2
+  m_EditorClassIdentifier: 
+  difficulty: 0
+  scoreReward: 100
+  filledTubeCount: 7
+  emptyTubeCount: 2
+  tubes:
+  - {fileID: 11400000, guid: 3cfe1f788d4374cc88fb2b1ef432dbfb, type: 2}
+  - {fileID: 11400000, guid: e8c23b1ec62bd4239ab383352249c2ce, type: 2}
+  - {fileID: 11400000, guid: fa2b240b94ba64900a9b45f56aa5ca42, type: 2}
+  - {fileID: 11400000, guid: 6599c4db4c057490c99d2035fb28a8cd, type: 2}
+  - {fileID: 11400000, guid: 95e013e0d73e540a8b6e854d40d665bd, type: 2}
+  - {fileID: 11400000, guid: 15bb9e3c19bc14940af86e02c6d8e590, type: 2}
+  - {fileID: 11400000, guid: ddb0c81ff5acb43ff8f9df6fce60493e, type: 2}

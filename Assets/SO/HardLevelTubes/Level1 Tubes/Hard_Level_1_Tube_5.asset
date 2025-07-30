@@ -9,9 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fb67a697286954cd7a33b913d962fa69, type: 3}
-  m_Name: Medium_Level_1
+  m_Script: {fileID: 11500000, guid: 19fc6e70ec6a7484e9d6bd3b12927de8, type: 3}
+  m_Name: Hard_Level_1_Tube_5
   m_EditorClassIdentifier: 
-  difficulty: 1
-  scoreReward: 50
-  tubes: []
+  balls: 03000000010000000500000000000000

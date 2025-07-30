@@ -1,24 +1,36 @@
 using UnityEngine;
 using DG.Tweening;
 using System.Collections.Generic;
-using System.Linq;
-
 
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
-    private List<TubeController> allTubes;
-    private TubeController selectedTube = null;
+
+    [Header("Refs")]
     [SerializeField] private LevelManager levelManager;
 
+    [Header("Stacking")]
+    [Tooltip("Vertical distance between stacked balls (must match LevelLoader).")]
+    [SerializeField] private float slotSpacingY = 0.55f; // MUST match LevelLoader
+
+    [Header("Movement")]
+    [Tooltip("Time it takes to move a ball to a new tube.")]
+    [SerializeField] private float moveDuration = 0.35f;
+    [Tooltip("Minimum jump height for arc movement.")]
+    [SerializeField] private float minJumpPower = 0.6f;
+    [Tooltip("Maximum jump height for arc movement.")]
+    [SerializeField] private float maxJumpPower = 2.0f;
+    [Tooltip("Scales jump height by horizontal distance.")]
+    [SerializeField] private float jumpPowerPerUnitX = 0.25f;
+
+    private List<TubeController> allTubes;
+    private TubeController selectedTube = null;
+
+    // (Optional) score tracking
     private int totalScore = 0;
-
-
-
 
     private void Awake()
     {
-        // Singleton pattern setup
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
@@ -30,22 +42,23 @@ public class GameManager : MonoBehaviour
     public void SetTubes(List<TubeController> tubes)
     {
         allTubes = tubes;
+        selectedTube = null;
     }
 
     public void ClearTubes()
     {
-        allTubes.Clear();
+        if (allTubes != null) allTubes.Clear();
         selectedTube = null;
     }
 
-    // Called by TubeController when it is clicked.
-    /// Handles selection and transfer logic.
-
+    /// <summary>
+    /// Called by TubeController.OnMouseDown() — selection & transfer.
+    /// </summary>
     public void OnTubeClicked(TubeController clickedTube)
     {
-        Debug.Log("Clicked on Tube: " + clickedTube.name);
+        if (clickedTube == null || allTubes == null) return;
 
-        // First click – select tube
+        // First click → select source tube (must have at least one ball)
         if (selectedTube == null)
         {
             if (!clickedTube.IsEmpty())
@@ -53,120 +66,123 @@ public class GameManager : MonoBehaviour
                 selectedTube = clickedTube;
                 HighlightTube(selectedTube, true);
 
+                // Visual lift in world space
                 float tubeTopY = selectedTube.transform.position.y + selectedTube.GetTubeHeight();
-                float liftTargetY = tubeTopY + 0.30f; // or 10–20% higher if needed
-
+                float liftTargetY = tubeTopY + 0.30f;
                 BallController topBall = selectedTube.GetTopBall();
-
-                if (topBall != null)
-                {
-                    topBall.LiftToWorldY(liftTargetY);
-                    // visually lifts the ball
-                }
-
-                return;
+                topBall?.LiftToWorldY(liftTargetY);
             }
+            return;
         }
 
-        // Clicked same tube again → cancel selection
+        // Click again on same tube → cancel selection
         if (clickedTube == selectedTube)
         {
             BallController topBall = selectedTube.GetTopBall();
-            if (topBall != null)
-            {
-                topBall.ReturnToOriginal(); // return to place
-            }
+            topBall?.ReturnToOriginal();
 
             HighlightTube(selectedTube, false);
             selectedTube = null;
             return;
         }
 
-        // Attempt to move top ball
-        BallController ballToMove = selectedTube.GetTopBall();
-
-        if (ballToMove != null && clickedTube.CanReceiveBall(ballToMove))
+        // Attempt transfer: selectedTube → clickedTube
+        BallController movingBall = selectedTube.GetTopBall();
+        if (movingBall != null && clickedTube.CanReceiveBall(movingBall))
         {
+            // Update tube stacks (data)
             selectedTube.RemoveTopBall();
-            clickedTube.AddBall(ballToMove);
+            clickedTube.AddBall(movingBall);
 
-            // Reparent the ball
-            ballToMove.transform.SetParent(clickedTube.transform);
+            // Reparent first (keep world position)
+            movingBall.transform.SetParent(clickedTube.transform, true);
 
-            // Animate move to new position
-            float yOffset = 0.71f;
-            int targetIndex = clickedTube.GetBallCount() - 1;
-            Vector3 newPos = clickedTube.transform.position + Vector3.up * yOffset * targetIndex;
-            ballToMove.transform.DOMove(newPos, 0.3f).SetEase(Ease.OutBack);
+            // Compute local target slot & convert to world for DOJump arc
+            int targetIndex = clickedTube.GetBallCount() - 1; // last slot index
+            Vector3 localTarget = new Vector3(0f, slotSpacingY * targetIndex, 0f);
+            Vector3 targetWorldPos = clickedTube.transform.TransformPoint(localTarget);
 
+            // Dynamic jump height based on horizontal distance
+            float distX = Mathf.Abs(targetWorldPos.x - movingBall.transform.position.x);
+            float jumpPower = Mathf.Clamp(minJumpPower + distX * jumpPowerPerUnitX, minJumpPower, maxJumpPower);
+
+            // Animate arc jump in world space
+            movingBall.transform.DOKill();
+            movingBall.transform
+                      .DOJump(targetWorldPos, jumpPower, 1, moveDuration)
+                      .SetEase(Ease.OutQuad);
+
+            // Check win after a valid move
             CheckWinCondition();
         }
         else
         {
-            // Invalid move → return to original
-            ballToMove?.ReturnToOriginal();
+            // Invalid move → return the lifted ball
+            movingBall?.ReturnToOriginal();
         }
 
+        // Deselect source tube
         HighlightTube(selectedTube, false);
         selectedTube = null;
     }
 
-    // Add highlight effect to selected tube.
-
     private void HighlightTube(TubeController tube, bool highlight)
     {
-        var renderer = tube.GetComponent<SpriteRenderer>();
-        if (renderer != null)
-        {
-            renderer.color = highlight ? Color.yellow : Color.white;
-        }
+        if (tube == null) return;
+        var sr = tube.GetComponent<SpriteRenderer>();
+        if (sr != null) sr.color = highlight ? Color.yellow : Color.red; // as per your current choice
     }
 
-
-    // Check win logic.
+    /// <summary>
+    /// All non-empty tubes must be full and same color.
+    /// </summary>
     private void CheckWinCondition()
     {
+        if (allTubes == null) return;
+
         foreach (var tube in allTubes)
         {
+            if (tube == null) continue;
+
             int count = tube.GetBallCount();
+            if (count == 0) continue;                // empty tube is fine
+            if (count != tube.GetCapacity()) return; // not full → not win
 
-            if (count == 0)
-                continue;
-
-            if (count != tube.GetCapacity())
-                return;
-
-            BallColorType firstColor = tube.GetTopBall().GetColor();
+            BallController top = tube.GetTopBall();
+            if (top == null) return;
+            BallColorType color = top.GetColor();
 
             for (int i = 0; i < count; i++)
             {
-                BallController ball = tube.GetBallAtIndex(i);
-                if (ball == null || ball.GetColor() != firstColor)
-                    return;
+                var b = tube.GetBallAtIndex(i);
+                if (b == null || b.GetColor() != color)
+                    return; // mixed → not win
             }
         }
 
+        // All checks passed → Win!
         Debug.Log("✅ Level Completed!");
-
-        // ✅ Delay to allow effects (optional)
         Invoke(nameof(HandleLevelComplete), 0.5f);
     }
 
     private void HandleLevelComplete()
     {
-        // Destroy all tubes
-        foreach (var tube in allTubes)
+        // Optional: accumulate score
+        if (levelManager != null)
         {
-            if (tube != null)
-                Destroy(tube.gameObject);
+            totalScore += levelManager.GetCurrentLevelScore();
+            Debug.Log($"🏆 Total Score: {totalScore}");
         }
 
-        // ✅ Clear internal list
-        allTubes.Clear();
+        // Cleanup current tubes
+        if (allTubes != null)
+        {
+            foreach (var tube in allTubes)
+                if (tube != null) Destroy(tube.gameObject);
+            allTubes.Clear();
+        }
 
-        // ✅ Next Level
-        levelManager.LoadNextLevel();
+        // Next level
+        levelManager?.LoadNextLevel();
     }
-
-
 }
