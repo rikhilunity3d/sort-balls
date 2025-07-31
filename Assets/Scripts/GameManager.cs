@@ -10,23 +10,14 @@ public class GameManager : MonoBehaviour
     [SerializeField] private LevelManager levelManager;
 
     [Header("Stacking")]
-    [Tooltip("Vertical distance between stacked balls (must match LevelLoader).")]
-    [SerializeField] private float slotSpacingY = 0.55f; // MUST match LevelLoader
-
-    [Header("Movement")]
-    [Tooltip("Time it takes to move a ball to a new tube.")]
-    [SerializeField] private float moveDuration = 0.35f;
-    [Tooltip("Minimum jump height for arc movement.")]
-    [SerializeField] private float minJumpPower = 0.6f;
-    [Tooltip("Maximum jump height for arc movement.")]
-    [SerializeField] private float maxJumpPower = 2.0f;
-    [Tooltip("Scales jump height by horizontal distance.")]
-    [SerializeField] private float jumpPowerPerUnitX = 0.25f;
+    [SerializeField] private float slotSpacingY = 0.55f;  // Must match LevelLoader
+    [SerializeField] private float travelArcHeight = 1.5f; // Base arc height for ball travel
+    [SerializeField] private float minArcHeight = 1.0f;    // Minimum arc, even for flat transfers
+    [SerializeField] private float arcBoostMultiplier = 1.2f; // How much extra arc for low → high jump
 
     private List<TubeController> allTubes;
     private TubeController selectedTube = null;
 
-    // (Optional) score tracking
     private int totalScore = 0;
 
     private void Awake()
@@ -51,14 +42,10 @@ public class GameManager : MonoBehaviour
         selectedTube = null;
     }
 
-    /// <summary>
-    /// Called by TubeController.OnMouseDown() — selection & transfer.
-    /// </summary>
     public void OnTubeClicked(TubeController clickedTube)
     {
         if (clickedTube == null || allTubes == null) return;
 
-        // First click → select source tube (must have at least one ball)
         if (selectedTube == null)
         {
             if (!clickedTube.IsEmpty())
@@ -66,7 +53,6 @@ public class GameManager : MonoBehaviour
                 selectedTube = clickedTube;
                 HighlightTube(selectedTube, true);
 
-                // Visual lift in world space
                 float tubeTopY = selectedTube.transform.position.y + selectedTube.GetTubeHeight();
                 float liftTargetY = tubeTopY + 0.30f;
                 BallController topBall = selectedTube.GetTopBall();
@@ -75,53 +61,52 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // Click again on same tube → cancel selection
         if (clickedTube == selectedTube)
         {
             BallController topBall = selectedTube.GetTopBall();
             topBall?.ReturnToOriginal();
-
             HighlightTube(selectedTube, false);
             selectedTube = null;
             return;
         }
 
-        // Attempt transfer: selectedTube → clickedTube
         BallController movingBall = selectedTube.GetTopBall();
         if (movingBall != null && clickedTube.CanReceiveBall(movingBall))
         {
-            // Update tube stacks (data)
             selectedTube.RemoveTopBall();
             clickedTube.AddBall(movingBall);
 
-            // Reparent first (keep world position)
             movingBall.transform.SetParent(clickedTube.transform, true);
 
-            // Compute local target slot & convert to world for DOJump arc
-            int targetIndex = clickedTube.GetBallCount() - 1; // last slot index
+            int targetIndex = clickedTube.GetBallCount() - 1;
             Vector3 localTarget = new Vector3(0f, slotSpacingY * targetIndex, 0f);
-            Vector3 targetWorldPos = clickedTube.transform.TransformPoint(localTarget);
 
-            // Dynamic jump height based on horizontal distance
-            float distX = Mathf.Abs(targetWorldPos.x - movingBall.transform.position.x);
-            float jumpPower = Mathf.Clamp(minJumpPower + distX * jumpPowerPerUnitX, minJumpPower, maxJumpPower);
+            Vector3 startPos = movingBall.transform.position;
+            Vector3 endPos = clickedTube.transform.TransformPoint(localTarget);
 
-            // Animate arc jump in world space
+            // Dynamically calculate arc height based on Y difference
+            float verticalDelta = endPos.y - startPos.y;
+            float dynamicArcHeight = Mathf.Max(minArcHeight, travelArcHeight + Mathf.Max(0f, verticalDelta * arcBoostMultiplier));
+
+            float midX = (startPos.x + endPos.x) / 2f;
+            float arcY = Mathf.Max(startPos.y, endPos.y) + dynamicArcHeight;
+            Vector3 midPos = new Vector3(midX, arcY, startPos.z);
+
             movingBall.transform.DOKill();
-            movingBall.transform
-                      .DOJump(targetWorldPos, jumpPower, 1, moveDuration)
-                      .SetEase(Ease.OutQuad);
+            movingBall.transform.DOPath(new Vector3[] { startPos, midPos, endPos }, 0.5f, PathType.CatmullRom)
+                .SetEase(Ease.InOutSine)
+                .OnComplete(() =>
+                {
+                    movingBall.transform.localPosition = localTarget;
+                });
 
-            // Check win after a valid move
             CheckWinCondition();
         }
         else
         {
-            // Invalid move → return the lifted ball
             movingBall?.ReturnToOriginal();
         }
 
-        // Deselect source tube
         HighlightTube(selectedTube, false);
         selectedTube = null;
     }
@@ -130,12 +115,10 @@ public class GameManager : MonoBehaviour
     {
         if (tube == null) return;
         var sr = tube.GetComponent<SpriteRenderer>();
-        if (sr != null) sr.color = highlight ? Color.yellow : Color.red; // as per your current choice
+        if (sr != null)
+            sr.color = highlight ? Color.yellow : Color.white;
     }
 
-    /// <summary>
-    /// All non-empty tubes must be full and same color.
-    /// </summary>
     private void CheckWinCondition()
     {
         if (allTubes == null) return;
@@ -145,8 +128,8 @@ public class GameManager : MonoBehaviour
             if (tube == null) continue;
 
             int count = tube.GetBallCount();
-            if (count == 0) continue;                // empty tube is fine
-            if (count != tube.GetCapacity()) return; // not full → not win
+            if (count == 0) continue;
+            if (count != tube.GetCapacity()) return;
 
             BallController top = tube.GetTopBall();
             if (top == null) return;
@@ -156,25 +139,22 @@ public class GameManager : MonoBehaviour
             {
                 var b = tube.GetBallAtIndex(i);
                 if (b == null || b.GetColor() != color)
-                    return; // mixed → not win
+                    return;
             }
         }
 
-        // All checks passed → Win!
         Debug.Log("✅ Level Completed!");
         Invoke(nameof(HandleLevelComplete), 0.5f);
     }
 
     private void HandleLevelComplete()
     {
-        // Optional: accumulate score
         if (levelManager != null)
         {
             totalScore += levelManager.GetCurrentLevelScore();
             Debug.Log($"🏆 Total Score: {totalScore}");
         }
 
-        // Cleanup current tubes
         if (allTubes != null)
         {
             foreach (var tube in allTubes)
@@ -182,7 +162,6 @@ public class GameManager : MonoBehaviour
             allTubes.Clear();
         }
 
-        // Next level
         levelManager?.LoadNextLevel();
     }
 }

@@ -6586,6 +6586,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   levelManager: {fileID: 1441337485}
+  slotSpacingY: 0.75
+  travelArcHeight: 1.5
+  minArcHeight: 1
+  arcBoostMultiplier: 0.9
 --- !u!4 &1562373189
 Transform:
   m_ObjectHideFlags: 0
@@ -7804,6 +7808,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 472c2c64e6d4e42398a428bc42277e81, type: 2}
   - {fileID: 11400000, guid: f9a91f460fbe54ad9b713af45e1d9c46, type: 2}
   tubeLayoutPoints: {fileID: 534453}
+  slotSpacingY: 0.75
 --- !u!4 &1937457863
 Transform:
   m_ObjectHideFlags: 0
