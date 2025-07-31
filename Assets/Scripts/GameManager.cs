@@ -9,11 +9,10 @@ public class GameManager : MonoBehaviour
     [Header("Refs")]
     [SerializeField] private LevelManager levelManager;
 
-    [Header("Stacking")]
-    [SerializeField] private float slotSpacingY = 0.55f;  // Must match LevelLoader
-    [SerializeField] private float travelArcHeight = 1.5f; // Base arc height for ball travel
-    [SerializeField] private float minArcHeight = 1.0f;    // Minimum arc, even for flat transfers
-    [SerializeField] private float arcBoostMultiplier = 1.2f; // How much extra arc for low → high jump
+    [Header("Stacking & Travel")]
+    [SerializeField] private float slotSpacingY = 0.55f; // Match LevelLoader
+    [SerializeField] private float travelArcHeight = 1.5f; // Height for arc
+    [SerializeField] private float sideOffsetX = 1.5f; // Sideway detour distance
 
     private List<TubeController> allTubes;
     private TubeController selectedTube = null;
@@ -65,6 +64,7 @@ public class GameManager : MonoBehaviour
         {
             BallController topBall = selectedTube.GetTopBall();
             topBall?.ReturnToOriginal();
+
             HighlightTube(selectedTube, false);
             selectedTube = null;
             return;
@@ -81,24 +81,42 @@ public class GameManager : MonoBehaviour
             int targetIndex = clickedTube.GetBallCount() - 1;
             Vector3 localTarget = new Vector3(0f, slotSpacingY * targetIndex, 0f);
 
-            Vector3 startPos = movingBall.transform.position;
-            Vector3 endPos = clickedTube.transform.TransformPoint(localTarget);
+            // Calculate arc jump based on relative heights
+Vector3 startPos = movingBall.transform.position;
+Vector3 endPos = clickedTube.transform.TransformPoint(localTarget);
 
-            // Dynamically calculate arc height based on Y difference
-            float verticalDelta = endPos.y - startPos.y;
-            float dynamicArcHeight = Mathf.Max(minArcHeight, travelArcHeight + Mathf.Max(0f, verticalDelta * arcBoostMultiplier));
+// Adjust arc height if target tube is higher
+float dynamicArcY = Mathf.Max(startPos.y, endPos.y) + travelArcHeight;
 
-            float midX = (startPos.x + endPos.x) / 2f;
-            float arcY = Mathf.Max(startPos.y, endPos.y) + dynamicArcHeight;
-            Vector3 midPos = new Vector3(midX, arcY, startPos.z);
+// Lift up from current tube
+Vector3 liftPos = new Vector3(startPos.x, dynamicArcY, startPos.z);
 
-            movingBall.transform.DOKill();
-            movingBall.transform.DOPath(new Vector3[] { startPos, midPos, endPos }, 0.5f, PathType.CatmullRom)
-                .SetEase(Ease.InOutSine)
-                .OnComplete(() =>
-                {
-                    movingBall.transform.localPosition = localTarget;
-                });
+// Side detour to avoid straight line
+float direction = Mathf.Sign(endPos.x - startPos.x);
+Vector3 sideArcPos = new Vector3(startPos.x + direction * sideOffsetX, dynamicArcY + 0.5f, startPos.z);
+
+// Move directly above target
+Vector3 aboveTarget = new Vector3(endPos.x, dynamicArcY + 0.5f, startPos.z);
+
+// Construct smooth path
+Vector3[] path = new Vector3[]
+{
+    startPos,
+    liftPos,
+    sideArcPos,
+    aboveTarget,
+    endPos
+};
+
+movingBall.transform.DOKill();
+movingBall.transform.DOPath(path, 0.6f, PathType.CatmullRom)
+    .SetEase(Ease.InOutSine)
+    .OnComplete(() =>
+    {
+        // Final snap for stacking
+        movingBall.transform.localPosition = localTarget;
+    });
+
 
             CheckWinCondition();
         }

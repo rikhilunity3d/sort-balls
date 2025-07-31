@@ -6588,8 +6588,7 @@ MonoBehaviour:
   levelManager: {fileID: 1441337485}
   slotSpacingY: 0.75
   travelArcHeight: 1.5
-  minArcHeight: 1
-  arcBoostMultiplier: 0.9
+  sideOffsetX: 1.5
 --- !u!4 &1562373189
 Transform:
   m_ObjectHideFlags: 0
